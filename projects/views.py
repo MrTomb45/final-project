@@ -98,16 +98,12 @@ def complete_project(request, project_id):
 def toggle_participate(request, project_id):
     if request.method == 'POST':
         project = get_object_or_404(Project, pk=project_id)
-
-        # Проверяем, есть ли уже юзер. Если да - удаляем, если нет - добавляем
         if request.user in project.participants.all():
             project.participants.remove(request.user)
             is_participant = False
         else:
             project.participants.add(request.user)
             is_participant = True
-
-        # Теперь мы возвращаем JS-скрипту флаг participant!
         return JsonResponse({"status": "ok", "participant": is_participant})
 
     return JsonResponse({"error": "Method not allowed"}, status=405)

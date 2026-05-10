@@ -84,4 +84,5 @@ python manage.py runserver
 
 Git:https://github.com/MrTomb45/final-project
 
-
+Выполнил:
+Гуришкин Иван

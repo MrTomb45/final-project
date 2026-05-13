@@ -10,86 +10,96 @@ from .forms import UserRegistrationForm, UserLoginForm, UserEditForm
 
 
 def register_view(request):
-    if request.method == 'POST':
+    if request.method == "POST":
         form = UserRegistrationForm(request.POST)
         if form.is_valid():
             user = form.save()
             login(request, user)
-            return redirect('project_list')
+            return redirect("project_list")
     else:
         form = UserRegistrationForm()
-    return render(request, 'users/register.html', {'form': form})
+    return render(request, "users/register.html", {"form": form})
 
 
 def login_view(request):
-    if request.method == 'POST':
+    if request.method == "POST":
         form = UserLoginForm(request.POST)
         if form.is_valid():
-            email = form.cleaned_data.get('email')
+            email = form.cleaned_data.get("email")
             from django.contrib.auth import authenticate
-            user = authenticate(email=email, password=form.cleaned_data.get('password'))
+
+            user = authenticate(email=email, password=form.cleaned_data.get("password"))
             login(request, user)
-            return redirect('project_list')
+            return redirect("project_list")
     else:
         form = UserLoginForm()
-    return render(request, 'users/login.html', {'form': form})
+    return render(request, "users/login.html", {"form": form})
 
 
 def logout_view(request):
     logout(request)
-    return redirect('project_list')
+    return redirect("project_list")
 
 
 def user_details(request, user_id):
     user = get_object_or_404(User, pk=user_id)
-    return render(request, 'users/user-details.html', {'user': user})
+    return render(request, "users/user-details.html", {"user": user})
 
 
 @login_required
 def edit_profile(request):
-    if request.method == 'POST':
+    if request.method == "POST":
         form = UserEditForm(request.POST, request.FILES, instance=request.user)
         if form.is_valid():
             form.save()
-            return redirect('users:user_details', user_id=request.user.id)
+            return redirect("users:user_details", user_id=request.user.id)
     else:
         form = UserEditForm(instance=request.user)
-    return render(request, 'users/edit_profile.html', {'form': form})
+    return render(request, "users/edit_profile.html", {"form": form})
 
 
 def user_list(request):
-    participants_list = User.objects.all().order_by('id')
-    active_filter = request.GET.get('filter')
+    participants_list = User.objects.all().order_by("id")
+    active_filter = request.GET.get("filter")
 
     if active_filter and request.user.is_authenticated:
         if active_filter == "Авторы избранных проектов":
-            participants_list = participants_list.filter(owned_projects__in=request.user.favorites.all()).distinct()
+            participants_list = participants_list.filter(
+                owned_projects__in=request.user.favorites.all()
+            ).distinct()
         elif active_filter == "Авторы проектов, в которых я участвую":
-            participants_list = participants_list.filter(owned_projects__participants=request.user).distinct()
+            participants_list = participants_list.filter(
+                owned_projects__participants=request.user
+            ).distinct()
         elif active_filter == "Пользователи, которым нравятся мои проекты":
-            participants_list = participants_list.filter(favorites__in=request.user.owned_projects.all()).distinct()
+            participants_list = participants_list.filter(
+                favorites__in=request.user.owned_projects.all()
+            ).distinct()
         elif active_filter == "Участники моих проектов":
-            participants_list = participants_list.filter(participated_projects__owner=request.user).distinct()
+            participants_list = participants_list.filter(
+                participated_projects__owner=request.user
+            ).distinct()
 
     paginator = Paginator(participants_list, 4)
-    page_number = request.GET.get('page')
+    page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
 
-    return render(request, 'users/participants.html', {
-        'page_obj': page_obj,
-        'active_filter': active_filter
-    })
+    return render(
+        request,
+        "users/participants.html",
+        {"page_obj": page_obj, "active_filter": active_filter},
+    )
 
 
 @login_required
 def change_password(request):
-    if request.method == 'POST':
+    if request.method == "POST":
         form = PasswordChangeForm(request.user, request.POST)
         if form.is_valid():
             user = form.save()
             update_session_auth_hash(request, user)
-            return redirect('users:user_details', user_id=request.user.id)
+            return redirect("users:user_details", user_id=request.user.id)
     else:
         form = PasswordChangeForm(request.user)
 
-    return render(request, 'users/change_password.html', {'form': form})
+    return render(request, "users/change_password.html", {"form": form})

@@ -1,12 +1,5 @@
-import random
-
-from io import BytesIO
-from PIL import Image, ImageDraw, ImageFont
-
-from django.core.files.base import ContentFile
 from django.contrib.auth.models import (
     AbstractBaseUser,
-    BaseUserManager,
     PermissionsMixin,
 )
 from django.db import models
@@ -38,7 +31,9 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def save(self, *args, **kwargs):
         if not self.avatar and self.name:
-            self.avatar = generate_avatar(self.name[0].upper())
+            first_letter = str(self.name)[:1].upper()
+            if first_letter:
+                self.avatar = generate_avatar(first_letter)
         super().save(*args, **kwargs)
 
     def __str__(self):

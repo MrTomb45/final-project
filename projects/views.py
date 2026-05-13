@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
@@ -7,39 +9,33 @@ from .models import Project
 from .forms import ProjectForm
 
 
-def paginate_queryset(request, queryset, per_page=12):
+def paginate_queryset(request, queryset, per_page=6):
     paginator = Paginator(queryset, per_page)
     page_number = request.GET.get("page")
     return paginator.get_page(page_number)
 
 
 def project_list(request):
-    all_projects = Project.objects.all().order_by("-created_at")
+    all_projects = Project.objects.select_related("owner").order_by("-created_at")
 
-    paginator = Paginator(all_projects, 6)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
+    page_obj = paginate_queryset(request, all_projects, 6)
 
-    return render(
-        request,
-        template_name="projects/project_list.html",
-        context={"page_obj": page_obj},
-    )
+    return render(request, "projects/project_list.html", {"page_obj": page_obj})
 
 
 @login_required
 def favorite_projects(request):
-    favorites_list = request.user.favorites.all().order_by("-created_at")
+    favorites_list = request.user.favorites.select_related("owner").order_by(
+        "-created_at"
+    )
 
-    paginator = Paginator(favorites_list, 6)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
+    page_obj = paginate_queryset(request, favorites_list, 6)
 
     return render(request, "projects/favorite_projects.html", {"page_obj": page_obj})
 
 
 def project_details(request, project_id):
-    project = get_object_or_404(Project, pk=project_id)
+    project = get_object_or_404(Project.objects.select_related("owner"), pk=project_id)
     return render(request, "projects/project-details.html", {"project": project})
 
 
@@ -79,39 +75,57 @@ def edit_project(request, project_id):
 def toggle_favorite(request, project_id):
     if request.method == "POST":
         project = get_object_or_404(Project, pk=project_id)
-        if project in request.user.favorites.all():
+
+        is_favorite = request.user.favorites.filter(id=project.id).exists()
+
+        if is_favorite:
             request.user.favorites.remove(project)
             favorited = False
         else:
             request.user.favorites.add(project)
             favorited = True
         return JsonResponse({"status": "ok", "favorited": favorited})
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+
+    return JsonResponse(
+        {"error": "Method not allowed"}, status=HTTPStatus.METHOD_NOT_ALLOWED
+    )
 
 
 @login_required
 def complete_project(request, project_id):
     if request.method == "POST":
         project = get_object_or_404(Project, pk=project_id, owner=request.user)
-        if project.status == "open":
-            project.status = "closed"
+
+        if project.status == Project.STATUS_OPEN:
+            project.status = Project.STATUS_CLOSED
             project.save()
             return JsonResponse({"status": "ok", "project_status": "closed"})
-        return JsonResponse({"error": "Project is already closed"}, status=400)
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+        return JsonResponse(
+            {"error": "Project is already closed"}, status=HTTPStatus.BAD_REQUEST
+        )
+
+    return JsonResponse(
+        {"error": "Method not allowed"}, status=HTTPStatus.METHOD_NOT_ALLOWED
+    )
 
 
 @login_required
 def toggle_participate(request, project_id):
     if request.method == "POST":
         project = get_object_or_404(Project, pk=project_id)
-        if request.user in project.participants.all():
+
+        is_participant = project.participants.filter(id=request.user.id).exists()
+
+        if is_participant:
             project.participants.remove(request.user)
-            is_participant = False
+            participant_status = False
         else:
             project.participants.add(request.user)
-            is_participant = True
-        return JsonResponse({"status": "ok", "participant": is_participant})
+            participant_status = True
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+        return JsonResponse({"status": "ok", "participant": participant_status})
+
+    return JsonResponse(
+        {"error": "Method not allowed"}, status=HTTPStatus.METHOD_NOT_ALLOWED
+    )

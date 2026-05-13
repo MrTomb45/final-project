@@ -46,26 +46,3 @@ class UserEditForm(forms.ModelForm):
                 }
             ),
         }
-
-    def clean_phone(self):
-        phone = self.cleaned_data.get("phone")
-        if not phone:
-            return phone
-
-        if not re.match(r"^(8|\+7)\d{10}$", phone):
-            raise forms.ValidationError(
-                "Номер должен быть в формате 8XXXXXXXXXX или +7XXXXXXXXXX"
-            )
-
-        if User.objects.filter(phone=phone).exclude(pk=self.instance.pk).exists():
-            raise forms.ValidationError("Этот номер телефона уже используется.")
-
-        return phone
-
-    def clean_github_url(self):
-        url = self.cleaned_data.get("github_url")
-        if url and not url.startswith("https://github.com/"):
-            raise forms.ValidationError(
-                "Ссылка должна вести на GitHub (https://github.com/...)"
-            )
-        return url

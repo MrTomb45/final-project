@@ -1,12 +1,22 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import login, logout
+from django.contrib.auth import login, logout, authenticate, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import PasswordChangeForm
-from django.contrib.auth import update_session_auth_hash
 from django.core.paginator import Paginator
 
 from .models import User
 from .forms import UserRegistrationForm, UserLoginForm, UserEditForm
+
+FILTER_FAVORITE_AUTHORS = "favorite_project_authors"
+FILTER_COLLABORATORS = "project_collaborators"
+FILTER_MY_PROJECT_FANS = "my_project_fans"
+FILTER_MY_PROJECT_PARTICIPANTS = "my_project_participants"
+
+
+def get_paginated_page(request, queryset, items_per_page=4):
+    paginator = Paginator(queryset, items_per_page)
+    page_number = request.GET.get("page")
+    return paginator.get_page(page_number)
 
 
 def register_view(request):
@@ -26,11 +36,10 @@ def login_view(request):
         form = UserLoginForm(request.POST)
         if form.is_valid():
             email = form.cleaned_data.get("email")
-            from django.contrib.auth import authenticate
-
             user = authenticate(email=email, password=form.cleaned_data.get("password"))
-            login(request, user)
-            return redirect("project_list")
+            if user:
+                login(request, user)
+                return redirect("project_list")
     else:
         form = UserLoginForm()
     return render(request, "users/login.html", {"form": form})
@@ -63,26 +72,24 @@ def user_list(request):
     active_filter = request.GET.get("filter")
 
     if active_filter and request.user.is_authenticated:
-        if active_filter == "Авторы избранных проектов":
+        if active_filter == FILTER_FAVORITE_AUTHORS:
             participants_list = participants_list.filter(
                 owned_projects__in=request.user.favorites.all()
             ).distinct()
-        elif active_filter == "Авторы проектов, в которых я участвую":
+        elif active_filter == FILTER_COLLABORATORS:
             participants_list = participants_list.filter(
                 owned_projects__participants=request.user
             ).distinct()
-        elif active_filter == "Пользователи, которым нравятся мои проекты":
+        elif active_filter == FILTER_MY_PROJECT_FANS:
             participants_list = participants_list.filter(
                 favorites__in=request.user.owned_projects.all()
             ).distinct()
-        elif active_filter == "Участники моих проектов":
+        elif active_filter == FILTER_MY_PROJECT_PARTICIPANTS:
             participants_list = participants_list.filter(
                 participated_projects__owner=request.user
             ).distinct()
 
-    paginator = Paginator(participants_list, 4)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
+    page_obj = get_paginated_page(request, participants_list)
 
     return render(
         request,
